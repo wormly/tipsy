@@ -227,10 +227,10 @@
                 $(this).on(eventIn, options.live, enter);
                 $(this).on(eventOut, options.live, leave);
             } else {
-                if (options.live && !$.live) {
-                    //live === true and using jQuery >= 1.9
-                    throw "Since jQuery 1.9, pass selector as live argument. eg. $(document).tipsy({live: 'a.live'});";
-                }
+                // if (options.live && !$.live) {
+                //     //live === true and using jQuery >= 1.9
+                //     throw "Since jQuery 1.9, pass selector as live argument. eg. $(document).tipsy({live: 'a.live'});";
+                // }
                 var binder = options.live ? 'live' : 'bind';
                 this[binder](eventIn, enter)[binder](eventOut, leave);
             }
