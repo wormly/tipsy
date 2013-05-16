@@ -200,7 +200,7 @@
             } else {
                 tipsy.fixTitle();
                 setTimeout(function() {
-                    if (tipsy.hoverState == 'in' && isElementInDOM(tipsy.$element)) {
+                    if (tipsy.hoverState == 'in') {
                         tipsy.show();
                     }
                 }, options.delayIn);
@@ -220,8 +220,8 @@
         if (!options.live) this.each(function() { get(this); });
 
         if (options.trigger != 'manual') {
-            var eventIn  = options.trigger == 'hover' ? 'mouseenter mouseover' : 'focus',
-                eventOut = options.trigger == 'hover' ? 'mouseleave mouseout' : 'blur';
+            var eventIn  = options.trigger == 'hover' ? 'mouseover' : 'focus',
+                eventOut = options.trigger == 'hover' ? 'mouseout' : 'blur';
 
             if (options.live && options.live !== true) {
                 $(this).on(eventIn, options.live, enter);
@@ -243,7 +243,7 @@
     $.fn.tipsy.defaults = {
         aria: false,
         className: null,
-        delayIn: 0,
+        delayIn: 200,
         delayOut: 0,
         fade: false,
         shadow: false,
