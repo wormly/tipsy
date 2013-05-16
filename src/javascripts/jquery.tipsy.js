@@ -221,7 +221,7 @@
 
         if (options.trigger != 'manual') {
             var eventIn  = options.trigger == 'hover' ? 'mouseover' : 'focus',
-                eventOut = options.trigger == 'hover' ? 'mouseout' : 'blur';
+                eventOut = options.trigger == 'hover' ? 'mouseout click' : 'blur';
 
             if (options.live && options.live !== true) {
                 $(this).on(eventIn, options.live, enter);
