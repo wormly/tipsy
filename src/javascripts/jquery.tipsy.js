@@ -3,10 +3,10 @@
 // (c) 2008-2010 jason frame [jason@onehackoranother.com]
 // released under the MIT license
 
-(function($) {
+(function($, window, undefined) {
 
-    function maybeCall(thing, ctx) {
-        return (typeof thing == 'function') ? (thing.call(ctx)) : thing;
+    function maybeCall(thing, ctx, arg1, arg2) {
+        return (typeof thing == 'function') ? (thing.call(ctx, arg1, arg2)) : thing;
     }
 
     function isElementInDOM(ele) {
@@ -15,6 +15,15 @@
         }
         return false;
     }
+
+	// Returns true if it is a DOM element
+	// http://stackoverflow.com/a/384380/999
+	function isElement(o){
+		return (
+			typeof HTMLElement === "object" ? o instanceof HTMLElement : //DOM2
+			o && typeof o === "object" && o.nodeType === 1 && typeof o.nodeName==="string"
+		);	
+	}
 
     var tipsyIDcounter = 0;
     function tipsyID() {
@@ -34,7 +43,7 @@
                 return;
             }
 
-            if (this.$element instanceof HTMLElement && !this.$element.is(':visible')) { 
+            if (isElement(this.$element) && !this.$element.is(':visible')) { 
                 return; 
             }
             
@@ -65,7 +74,7 @@
 
                 var actualWidth = $tip[0].offsetWidth,
                     actualHeight = $tip[0].offsetHeight,
-                    gravity = maybeCall(this.options.gravity, this.$element[0]);
+                    gravity = maybeCall(this.options.gravity, this.$element[0], actualWidth, actualHeight);
 
                 var tp;
                 switch (gravity.charAt(0)) {
@@ -95,11 +104,12 @@
 
                 $tip.css(tp).addClass('tipsy-' + gravity + this.options.theme);
                 $tip.find('.tipsy-arrow' + this.options.theme)[0].className = 'tipsy-arrow' + this.options.theme + ' tipsy-arrow-' + gravity.charAt(0) + this.options.theme;
+                $tip.css({width: (actualWidth - 10) + 'px'});
 
                 if (this.options.fade) {
                     if(this.options.shadow)
                         $(".tipsy-inner").css({'box-shadow': '0px 0px '+this.options.shadowBlur+'px '+this.options.shadowSpread+'px rgba(0, 0, 0, '+this.options.shadowOpacity+')', '-webkit-box-shadow': '0px 0px '+this.options.shadowBlur+'px '+this.options.shadowSpread+'px rgba(0, 0, 0, '+this.options.shadowOpacity+')'});
-                    $tip.stop().css({opacity: 0, display: 'block', visibility: 'visible'}).animate({opacity: this.options.opacity});
+                    $tip.stop().css({opacity: 0, display: 'block', visibility: 'visible'}).animate({opacity: this.options.opacity}, this.options.fadeInTime);
                 } else {
                     $tip.css({visibility: 'visible', opacity: this.options.opacity});
                 }
@@ -114,7 +124,7 @@
 
         hide: function() {
             if (this.options.fade) {
-                this.tip().stop().fadeOut(function() { $(this).remove(); });
+                this.tip().stop().fadeOut(this.options.fadeOutTime, function() { $(this).remove(); });
             } else {
                 this.tip().remove();
             }
@@ -227,10 +237,10 @@
                 $(this).on(eventIn, options.live, enter);
                 $(this).on(eventOut, options.live, leave);
             } else {
-                // if (options.live && !$.live) {
-                //     //live === true and using jQuery >= 1.9
-                //     throw "Since jQuery 1.9, pass selector as live argument. eg. $(document).tipsy({live: 'a.live'});";
-                // }
+                if (options.live && !$.live) {
+                    //live === true and using jQuery >= 1.9
+                    throw "Since jQuery 1.9, pass selector as live argument. eg. $(document).tipsy({live: 'a.live'});";
+                }
                 var binder = options.live ? 'live' : 'bind';
                 this[binder](eventIn, enter)[binder](eventOut, leave);
             }
@@ -246,6 +256,8 @@
         delayIn: 200,
         delayOut: 0,
         fade: false,
+        fadeInTime: 400,
+        fadeOutTime: 400, 
         shadow: false,
         shadowBlur: 8,
         shadowOpacity: 1,
@@ -303,34 +315,42 @@
     };
 
     /**
-     * yields a closure of the supplied parameters, producing a function that takes
-     * no arguments and is suitable for use as an autogravity function like so:
-     *
-     * @param margin (int) - distance from the viewable region edge that an
-     *        element should be before setting its tooltip's gravity to be away
-     *        from that edge.
-     * @param prefer (string, e.g. 'n', 'sw', 'w') - the direction to prefer
-     *        if there are no viewable region edges effecting the tooltip's
-     *        gravity. It will try to vary from this minimally, for example,
-     *        if 'sw' is preferred and an element is near the right viewable
-     *        region edge, but not the top edge, it will set the gravity for
-     *        that element's tooltip to be 'se', preserving the southern
-     *        component.
+     * Improved version of autoBounds for automatic placement of chunky tips
+     * The original autoBounds failed in two regards: 1. it would never return a 'w' or 'e', gravity even if they
+     * were preferred and/or optimal, 2. it only respected the margin between the left hand side of an element and
+     * left hand side of the viewport, and the top of an element and the top of the viewport. This version checks
+     * to see if the bottom of an element is too close to the bottom of the screen, similarly for the right hand side
      */
-    $.fn.tipsy.autoBounds = function(marginNorth, marginEast, prefer) {
-        return function() {
-            var dir = {ns: prefer[0], ew: (prefer.length > 1 ? prefer[1] : false)},
-                boundTop = $(document).scrollTop() + marginNorth,
-                boundLeft = $(document).scrollLeft() + marginEast,
+    $.fn.tipsy.autoBounds2 = function(margin, prefer) {
+        return function(width, height) {
+            var dir = {},
+                boundTop = $(document).scrollTop() + margin,
+                boundLeft = $(document).scrollLeft() + margin,
                 $this = $(this);
 
-            if ($this.offset().top < boundTop) dir.ns = 'n';
-            if ($this.offset().left < boundLeft) dir.ew = 'w';
-            if ($(window).width() + $(document).scrollLeft() - $this.offset().left < marginEast) dir.ew = 'e';
-            if ($(window).height() + $(document).scrollTop() - $this.offset().top < marginNorth) dir.ns = 's';
+            // bi-directional string (ne, se, sw, etc...)
+            if (prefer.length > 1) {
+                dir.ns = prefer[0];
+                dir.ew = prefer[1];
+            } else {
+                // single direction string (e, w, n or s)
+                if (prefer[0] == 'e' || prefer[0] == 'w') {
+                    dir.ew = prefer[0];
+                } else {
+                    dir.ns = prefer[0];
+                }
+            }
 
-            return dir.ns + (dir.ew ? dir.ew : '');
-        };
+            if ($this.offset().top - height < boundTop) dir.ns = 'n';
+            if ($this.offset().left - width < boundLeft) dir.ew = 'w';
+            if ($(window).width() + $(document).scrollLeft() - ($this.offset().left + width) < margin) dir.ew = 'e';
+            if ($(window).height() + $(document).scrollTop() - ($this.offset().top + height) < margin) dir.ns = 's';
+
+            if (dir.ns) {
+                return dir.ns + (dir.ew ? dir.ew : '');
+            }
+            return dir.ew;
+        }
     };
-
-})(jQuery);
+    
+})(jQuery, window);
